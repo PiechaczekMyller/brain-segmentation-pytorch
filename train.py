@@ -9,7 +9,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
+from nfnets import SGD_AGC, replace_conv
 
 from dataset import BrainSegmentationDataset as Dataset
 from logger import Logger
@@ -34,11 +34,12 @@ def main(args):
 
     unet = UNet(in_channels=Dataset.in_channels, out_channels=Dataset.out_channels)
     unet.to(device)
+    replace_conv(unet)
 
     dsc_loss = DiceLoss()
     best_validation_dsc = 0.0
 
-    optimizer = optim.SGD(unet.parameters(), lr=args.lr)
+    optimizer = SGD_AGC(unet.parameters(), lr=args.lr)
 
     logger = Logger(experiment)
     loss_train = []
