@@ -7,6 +7,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from comet_ml import Experiment
 
 from dataset import BrainSegmentationDataset as Dataset
 from logger import Logger
@@ -21,6 +22,9 @@ def main(args):
     snapshotargs(args)
     device = torch.device("cpu" if not torch.cuda.is_available() else args.device)
 
+    experiment = Experiment(project_name="nfu-net", workspace='szympie', api_key="5eb4hbQiSXDeTITt6DIucXuzk")
+    experiment.log_parameters(vars(args))
+
     loader_train, loader_valid = data_loaders(args)
     loaders = {"train": loader_train, "valid": loader_valid}
 
@@ -30,9 +34,9 @@ def main(args):
     dsc_loss = DiceLoss()
     best_validation_dsc = 0.0
 
-    optimizer = optim.Adam(unet.parameters(), lr=args.lr)
+    optimizer = optim.SGD(unet.parameters(), lr=args.lr)
 
-    logger = Logger(args.logs)
+    logger = Logger(experiment)
     loss_train = []
     loss_valid = []
 
