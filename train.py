@@ -89,7 +89,7 @@ def main(args):
                                 logger.image_list_summary(
                                     tag,
                                     log_images(x, y_true, y_pred)[:num_images],
-                                    step,
+                                    epoch,
                                 )
 
                     if phase == "train":
@@ -98,11 +98,11 @@ def main(args):
                         optimizer.step()
 
             if phase == "train":
-                log_loss_summary(logger, loss_train, step, prefix="train_")
+                log_loss_summary(logger, loss_train, epoch, prefix="train_")
                 loss_train = []
 
             if phase == "valid":
-                log_loss_summary(logger, loss_valid, step, prefix="val_")
+                log_loss_summary(logger, loss_valid, epoch, prefix="val_")
                 mean_dsc = np.mean(
                     dsc_per_volume(
                         validation_pred,
@@ -110,16 +110,16 @@ def main(args):
                         loader_valid.dataset.patient_slice_index,
                     )
                 )
-                logger.scalar_summary("val_dsc", mean_dsc, step)
+                logger.scalar_summary("val_dsc", mean_dsc, epoch)
                 if mean_dsc > best_validation_dsc:
                     best_validation_dsc = mean_dsc
                     torch.save(unet.state_dict(), os.path.join(args.weights, "unet.pt"))
                     experiment.log_model("unet", os.path.join(args.weights, "unet.pt"), overwrite=True)
                 loss_valid = []
             phase_duration = time() - phase_start
-            logger.scalar_summary(f'{phase}_phase_time', phase_duration, step=step)
+            logger.scalar_summary(f'{phase}_phase_time', phase_duration, step=epoch)
         epoch_duration = time() - epoch_start
-        logger.scalar_summary('epoch_time', epoch_duration, step=step)
+        logger.scalar_summary('epoch_time', epoch_duration, step=epoch)
     print("Best validation mean DSC: {:4f}".format(best_validation_dsc))
 
 
