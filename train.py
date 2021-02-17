@@ -2,12 +2,14 @@ import argparse
 import json
 import os
 
+from time import time
+from comet_ml import Experiment
 import numpy as np
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from comet_ml import Experiment
+
 
 from dataset import BrainSegmentationDataset as Dataset
 from logger import Logger
@@ -17,7 +19,9 @@ from unet import UNet
 from utils import log_images, dsc
 
 
+
 def main(args):
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
     makedirs(args)
     snapshotargs(args)
     device = torch.device("cpu" if not torch.cuda.is_available() else args.device)
@@ -43,7 +47,9 @@ def main(args):
     step = 0
 
     for epoch in tqdm(range(args.epochs), total=args.epochs):
+        epoch_start = time()
         for phase in ["train", "valid"]:
+            phase_start = time()
             if phase == "train":
                 unet.train()
             else:
@@ -91,9 +97,9 @@ def main(args):
                         loss.backward()
                         optimizer.step()
 
-                if phase == "train" and (step + 1) % 10 == 0:
-                    log_loss_summary(logger, loss_train, step)
-                    loss_train = []
+            if phase == "train":
+                log_loss_summary(logger, loss_train, step, prefix="train_")
+                loss_train = []
 
             if phase == "valid":
                 log_loss_summary(logger, loss_valid, step, prefix="val_")
@@ -108,8 +114,12 @@ def main(args):
                 if mean_dsc > best_validation_dsc:
                     best_validation_dsc = mean_dsc
                     torch.save(unet.state_dict(), os.path.join(args.weights, "unet.pt"))
+                    experiment.log_model("unet", os.path.join(args.weights, "unet.pt"), overwrite=True)
                 loss_valid = []
-
+            phase_duration = time() - phase_start
+            logger.scalar_summary(f'{phase}_phase_time', phase_duration, step=step)
+        epoch_duration = time() - epoch_start
+        logger.scalar_summary('epoch_time', epoch_duration, step=step)
     print("Best validation mean DSC: {:4f}".format(best_validation_dsc))
 
 
@@ -124,15 +134,11 @@ def data_loaders(args):
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=True,
-        num_workers=args.workers,
-        worker_init_fn=worker_init,
     )
     loader_valid = DataLoader(
         dataset_valid,
         batch_size=args.batch_size,
         drop_last=False,
-        num_workers=args.workers,
-        worker_init_fn=worker_init,
     )
 
     return loader_train, loader_valid
